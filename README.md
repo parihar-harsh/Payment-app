@@ -1,6 +1,6 @@
-# PayTM Clone - Digital Wallet Application
+# Payment-app - Digital Wallet Application
 
-A full-stack digital wallet application similar to PayTM, built with the MERN stack (MongoDB, Express.js, React, Node.js). Users can create accounts, manage their balance, search for other users, and transfer money securely.
+A full-stack digital wallet application similar to Payment-app, built with the MERN stack (MongoDB, Express.js, React, Node.js). Users can create accounts, manage their balance, search for other users, and transfer money securely.
 
 ## Features
 
@@ -103,9 +103,9 @@ module.exports = {
 
 Update MongoDB connection in `backend/db.js`:
 ```javascript
-mongoose.connect("mongodb://localhost:27017/paytm")
+mongoose.connect("mongodb://localhost:27017/Payment-app")
 // Or use MongoDB Atlas:
-// mongoose.connect("mongodb+srv://username:password@cluster.mongodb.net/paytm")
+// mongoose.connect("mongodb+srv://username:password@cluster.mongodb.net/Payment-app")
 ```
 
 4. **Start the backend server:**
@@ -561,7 +561,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- Inspired by PayTM and modern digital wallet applications
+- Inspired by Payment-app and modern digital wallet applications
 - Built as a learning project for full-stack MERN development
 - Tailwind CSS for styling
 - React Router for navigation
