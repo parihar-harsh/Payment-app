@@ -1,8 +1,17 @@
-# React + Vite
+# Payment App Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Responsive React client for the Payment App API.
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+cp .env.example .env
+npm install
+npm run dev
+```
+
+`VITE_API_URL` must point to the backend `/api/v1` URL. The backend CORS
+configuration must include the frontend origin.
+
+Authentication tokens use session storage, so closing the tab ends the local
+session. Protected routes redirect unauthenticated visitors to sign in.

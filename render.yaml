@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: payflow-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 1h
+      - key: BCRYPT_ROUNDS
+        value: 12
+      - key: SIGNUP_BONUS
+        value: 10000
+      - key: CORS_ORIGINS
+        sync: false
+      - key: REQUIRE_TRANSACTIONS
+        value: true
+      - key: TRUST_PROXY
+        value: true

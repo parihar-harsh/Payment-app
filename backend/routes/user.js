@@ -1,143 +1,173 @@
-// backend/routes/user.js
-const express = require('express');
+const crypto = require("crypto");
+const express = require("express");
+const bcrypt = require("bcryptjs");
+const { SignJWT } = require("jose");
+const mongoose = require("mongoose");
+const { User, Account } = require("../db");
+const {
+    JWT_SECRET,
+    JWT_EXPIRES_IN,
+    BCRYPT_ROUNDS,
+    SIGNUP_BONUS
+} = require("../config");
+const { AppError } = require("../errors");
+const { authMiddleware, asyncHandler } = require("../middleware");
+const {
+    signupBody,
+    signinBody,
+    updateBody,
+    searchQuery,
+    parse
+} = require("../validation");
 
 const router = express.Router();
-const zod = require("zod");
-const { User, Account } = require("../db");
-const jwt = require("jsonwebtoken");
-const { JWT_SECRET } = require("../config");
-const  { authMiddleware } = require("../middleware");
+const jwtSecret = new TextEncoder().encode(JWT_SECRET);
 
-const signupBody = zod.object({
-    username: zod.string().email(),
-	firstName: zod.string(),
-	lastName: zod.string(),
-	password: zod.string()
-})
+const createToken = userId => new SignJWT({ userId: userId.toString() })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuer("payment-app")
+    .setIssuedAt()
+    .setExpirationTime(JWT_EXPIRES_IN)
+    .sign(jwtSecret);
 
-router.post("/signup", async (req, res) => {
-    const { success } = signupBody.safeParse(req.body)
-    if (!success) {
-        return res.status(411).json({
-            message: "Email already taken / Incorrect inputs"
-        })
+const verifyPassword = async (suppliedPassword, storedPassword) => {
+    if (storedPassword.startsWith("$2")) {
+        return bcrypt.compare(suppliedPassword, storedPassword);
     }
 
-    const existingUser = await User.findOne({
-        username: req.body.username
-    })
+    const supplied = Buffer.from(suppliedPassword);
+    const stored = Buffer.from(storedPassword);
+    return supplied.length === stored.length && crypto.timingSafeEqual(supplied, stored);
+};
 
-    if (existingUser) {
-        return res.status(411).json({
-            message: "Email already taken/Incorrect inputs"
-        })
+const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+router.post("/signup", asyncHandler(async (req, res) => {
+    const input = parse(signupBody, req.body);
+    const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
+    const session = await mongoose.startSession();
+    let user;
+
+    try {
+        await session.withTransaction(async () => {
+            [user] = await User.create([{
+                username: input.username,
+                password: passwordHash,
+                firstName: input.firstName,
+                lastName: input.lastName
+            }], { session });
+
+            await Account.create([{
+                userId: user._id,
+                balance: SIGNUP_BONUS
+            }], { session });
+        });
+    } finally {
+        await session.endSession();
     }
 
-    const user = await User.create({
-        username: req.body.username,
-        password: req.body.password,
-        firstName: req.body.firstName,
-        lastName: req.body.lastName,
-    })
-    const userId = user._id;
-
-    await Account.create({
-        userId,
-        balance: 1 + Math.random() * 10000
-    })
-
-    const token = jwt.sign({
-        userId
-    }, JWT_SECRET);
-
-    res.json({
+    res.status(201).json({
         message: "User created successfully",
-        token: token
-    })
-})
-
-
-const signinBody = zod.object({
-    username: zod.string().email(),
-	password: zod.string()
-})
-
-router.post("/signin", async (req, res) => {
-    const { success } = signinBody.safeParse(req.body)
-    if (!success) {
-        return res.status(411).json({
-            message: "Email already taken / Incorrect inputs"
-        })
-    }
-
-    const user = await User.findOne({
-        username: req.body.username,
-        password: req.body.password
+        token: await createToken(user._id),
+        user: {
+            id: user._id,
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName
+        }
     });
+}));
 
-    if (user) {
-        const token = jwt.sign({
-            userId: user._id
-        }, JWT_SECRET);
-  
-        res.json({
-            token: token
-        })
-        return;
+router.post("/signin", asyncHandler(async (req, res) => {
+    const input = parse(signinBody, req.body);
+    const user = await User.findOne({ username: input.username }).select("+password");
+
+    if (!user || !(await verifyPassword(input.password, user.password))) {
+        throw new AppError(401, "INVALID_CREDENTIALS", "Invalid email or password");
     }
 
-    
-    res.status(411).json({
-        message: "Error while logging in"
-    })
-})
-
-const updateBody = zod.object({
-	password: zod.string().optional(),
-    firstName: zod.string().optional(),
-    lastName: zod.string().optional(),
-})
-
-router.put("/", authMiddleware, async (req, res) => {
-    const { success } = updateBody.safeParse(req.body)
-    if (!success) {
-        res.status(411).json({
-            message: "Error while updating information"
-        })
+    // Transparently migrate accounts created by the old plaintext-password backend.
+    if (!user.password.startsWith("$2")) {
+        user.password = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
+        await user.save();
     }
-
-    await User.updateOne(req.body, {
-        id: req.userId
-    })
 
     res.json({
-        message: "Updated successfully"
-    })
-})
+        token: await createToken(user._id),
+        user: {
+            id: user._id,
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName
+        }
+    });
+}));
 
-router.get("/bulk", async (req, res) => {
-    const filter = req.query.filter || "";
+router.put("/", authMiddleware, asyncHandler(async (req, res) => {
+    const input = parse(updateBody, req.body);
+    const updates = { ...input };
 
-    const users = await User.find({
-        $or: [{
-            firstName: {
-                "$regex": filter
-            }
-        }, {
-            lastName: {
-                "$regex": filter
-            }
-        }]
-    })
+    if (updates.password) {
+        updates.password = await bcrypt.hash(updates.password, BCRYPT_ROUNDS);
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.userId,
+        { $set: updates },
+        { new: true, runValidators: true }
+    );
+
+    if (!user) {
+        throw new AppError(404, "USER_NOT_FOUND", "User not found");
+    }
+
+    res.json({
+        message: "Updated successfully",
+        user: {
+            id: user._id,
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName
+        }
+    });
+}));
+
+router.get("/bulk", authMiddleware, asyncHandler(async (req, res) => {
+    const { filter, page, limit } = parse(searchQuery, req.query);
+    const escapedFilter = escapeRegex(filter);
+    const match = {
+        _id: { $ne: req.userId },
+        ...(filter ? {
+            $or: [
+                { firstName: { $regex: escapedFilter, $options: "i" } },
+                { lastName: { $regex: escapedFilter, $options: "i" } }
+            ]
+        } : {})
+    };
+
+    const [users, total] = await Promise.all([
+        User.find(match)
+            .select("firstName lastName")
+            .sort({ firstName: 1, lastName: 1, _id: 1 })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .lean(),
+        User.countDocuments(match)
+    ]);
 
     res.json({
         user: users.map(user => ({
-            username: user.username,
             firstName: user.firstName,
             lastName: user.lastName,
             _id: user._id
-        }))
-    })
-})
+        })),
+        pagination: {
+            page,
+            limit,
+            total,
+            pages: Math.ceil(total / limit)
+        }
+    });
+}));
 
 module.exports = router;

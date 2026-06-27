@@ -6,7 +6,7 @@ A full-stack digital wallet application similar to Payment-app, built with the M
 
 ### User Features
 - **User Authentication**: Secure signup and signin with JWT tokens
-- **Account Management**: Each user gets a personal account with random initial balance (1-10,000 Rs)
+- **Account Management**: Each user gets a personal INR account
 - **Money Transfer**: Transfer funds between users with transaction safety
 - **User Search**: Real-time search to find other users by first name or last name
 - **Balance Display**: Check your current account balance on dashboard
@@ -26,7 +26,7 @@ A full-stack digital wallet application similar to Payment-app, built with the M
 ### Backend
 - **Node.js** & **Express.js**: Server and API framework
 - **MongoDB**: Database with Mongoose ODM
-- **JWT (jsonwebtoken)**: Token-based authentication
+- **JOSE**: JWT signing and verification
 - **Zod**: Schema validation for inputs
 - **CORS**: Cross-origin resource sharing
 
@@ -76,8 +76,8 @@ A full-stack digital wallet application similar to Payment-app, built with the M
 ## Installation & Setup
 
 ### Prerequisites
-- Node.js (v14 or higher)
-- MongoDB (local installation or MongoDB Atlas account)
+- Node.js 20 or higher
+- MongoDB Atlas or a local MongoDB replica set
 - npm or yarn package manager
 
 ### Backend Setup
@@ -93,24 +93,16 @@ npm install
 ```
 
 3. **Configure the application:**
-
-Update `backend/config.js`:
-```javascript
-module.exports = {
-    JWT_SECRET: "your-super-secret-jwt-key-change-this"
-}
+```bash
+cp .env.example .env
 ```
 
-Update MongoDB connection in `backend/db.js`:
-```javascript
-mongoose.connect("mongodb://localhost:27017/Payment-app")
-// Or use MongoDB Atlas:
-// mongoose.connect("mongodb+srv://username:password@cluster.mongodb.net/Payment-app")
-```
+Set a strong `JWT_SECRET`, configure `MONGODB_URI`, and review the allowed
+frontend origins. MongoDB transactions require a replica set.
 
 4. **Start the backend server:**
 ```bash
-node index.js
+npm start
 ```
 
 The backend server will run on `http://localhost:3000`
@@ -129,31 +121,29 @@ npm install
 
 3. **Configure API endpoint (if needed):**
 
-The frontend is configured to connect to `http://localhost:3000`. If your backend runs on a different URL, update the axios calls in:
-- `src/pages/Signup.jsx`
-- `src/pages/SendMoney.jsx`
-- `src/components/Users.jsx`
+Copy `frontend/.env.example` to `frontend/.env`. Set `VITE_API_URL` if the
+backend is not available at `http://localhost:3000/api/v1`.
 
 4. **Start the development server:**
 ```bash
 npm run dev
 ```
 
-The frontend will typically run on `http://localhost:5173` (Vite default) or `http://localhost:3000`
+The frontend will typically run on `http://localhost:5173`.
 
 ## Application Flow
 
 ### 1. User Registration
 - Navigate to `/signup`
 - Enter first name, last name, email, and password
-- Account is created with random initial balance (1-10,000 Rs)
-- JWT token is stored in localStorage
+- Account is created with the configured demo signup bonus (zero by default)
+- JWT token is stored in session storage
 - Redirected to dashboard
 
 ### 2. User Login
 - Navigate to `/signin`
 - Enter email and password
-- JWT token is stored in localStorage
+- JWT token is stored in session storage
 - Redirected to dashboard
 
 ### 3. Dashboard
@@ -324,13 +314,13 @@ or
 #### Signup
 - Form for user registration
 - Validates and sends data to backend
-- Stores JWT token in localStorage
+- Stores the JWT token in session storage
 - Redirects to dashboard on success
 
 #### Signin
 - Form for user login
 - Authenticates user credentials
-- Stores JWT token in localStorage
+- Stores the JWT token in session storage
 - Redirects to dashboard on success
 
 #### Dashboard
@@ -390,19 +380,10 @@ or
 ### Required for Production
 ⚠️ **Critical Security Issues:**
 
-1. **Password Hashing**: Passwords are currently stored in plain text
-   - Must implement bcrypt or argon2
-   - Never store plain text passwords
-
-2. **Environment Variables**: Sensitive data is hardcoded
-   - Move JWT_SECRET to .env file
-   - Use dotenv package
-   - Never commit .env to version control
-
-3. **HTTPS**: Use HTTPS in production
-4. **Rate Limiting**: Implement rate limiting to prevent abuse
-5. **Input Sanitization**: Add additional validation
-6. **CORS Configuration**: Restrict CORS to specific origins in production
+1. **HTTPS**: Terminate TLS at the deployment proxy
+2. **Distributed Rate Limiting**: Use a shared store when running multiple API instances
+3. **Secrets Management**: Store production secrets in the deployment platform
+4. **Monitoring**: Add structured logs, metrics, and alerts
 
 ## Database Schema
 
@@ -410,7 +391,7 @@ or
 ```javascript
 {
   username: String,      // Email, unique, required
-  password: String,      // Required, min 6 chars (NEEDS HASHING!)
+  password: String,      // Required bcrypt hash, excluded from normal queries
   firstName: String,     // Required, max 50 chars
   lastName: String,      // Required, max 50 chars
 }
@@ -420,7 +401,19 @@ or
 ```javascript
 {
   userId: ObjectId,      // Reference to User
-  balance: Number        // Required, decimal value
+  balance: Number,       // Non-negative whole INR amount
+  currency: "INR"
+}
+```
+
+### Transfer Model
+```javascript
+{
+  fromUserId: ObjectId,
+  toUserId: ObjectId,
+  amount: Number,
+  currency: "INR",
+  createdAt: Date
 }
 ```
 
@@ -451,6 +444,9 @@ nodemon index.js
 
 ## Production Deployment
 
+For the complete GitHub → MongoDB Atlas → Render → Vercel procedure, follow
+[DEPLOYMENT.md](DEPLOYMENT.md).
+
 ### Backend Deployment (Example: Heroku, Railway, Render)
 
 1. Add environment variables
@@ -474,23 +470,20 @@ npm run build
 
 1. **No Password Recovery**: Password reset not implemented
 2. **No Email Verification**: Email verification not implemented
-3. **No Transaction History**: Past transactions are not stored/displayed
-4. **No Error Notifications**: Limited user feedback on errors
-5. **Balance Not Real-time**: Dashboard balance requires refresh
-6. **No Input Validation on Frontend**: Only backend validation exists
-7. **Plain Text Passwords**: Critical security vulnerability
+3. **No Live Push Updates**: Other-device changes require navigation or refresh
+4. **Whole-Rupee Transfers Only**: Paise-level transfers are not supported
 
 ## Roadmap / Future Improvements
 
 ### High Priority (Security)
-- [ ] Implement bcrypt password hashing
-- [ ] Add environment variables (.env)
-- [ ] Implement rate limiting
+- [x] Implement bcrypt password hashing
+- [x] Add environment variables (.env)
+- [x] Implement rate limiting
 - [ ] Add HTTPS support
-- [ ] Implement proper error handling
+- [x] Implement proper error handling
 
 ### Features
-- [ ] Transaction history page
+- [x] Transaction history page
 - [ ] Email verification system
 - [ ] Password reset functionality
 - [ ] User profile management
@@ -530,7 +523,7 @@ npm run build
 - Verify API URLs in frontend code
 
 **Authentication errors:**
-- Check if token is stored in localStorage
+- Check if the token is stored in session storage
 - Verify JWT_SECRET matches between requests
 - Check token expiration
 
