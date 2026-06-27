@@ -44,15 +44,45 @@ the password before putting it in the URI.
 ## 3. Deploy the backend on Render
 
 1. Sign in to Render using GitHub.
-2. Select **New → Blueprint**.
+2. Select **New → Web Service**. Do not select Static Site or Blueprint.
 3. Connect `parihar-harsh/Payment-app`.
-4. Render detects the root `render.yaml`.
-5. When prompted, enter:
-   - `MONGODB_URI`: the Atlas SRV URI from step 2.
-   - `CORS_ORIGINS`: initially use `http://localhost:5173`; replace it with the
-     Vercel URL after step 4.
-6. Create the Blueprint and wait for the health check to pass.
-7. Copy the API URL, for example:
+4. Configure the service:
+
+```text
+Branch: master
+Root Directory: backend
+Runtime: Node
+Build Command: npm ci --omit=dev
+Start Command: npm start
+```
+
+5. Select the Free instance type for a hobby deployment.
+6. Add these environment variables:
+
+```text
+NODE_ENV=production
+HOST=0.0.0.0
+MONGODB_URI=<your Atlas SRV connection string>
+JWT_SECRET=<at least 32 random characters>
+JWT_EXPIRES_IN=1h
+BCRYPT_ROUNDS=12
+SIGNUP_BONUS=10000
+CORS_ORIGINS=http://localhost:5173
+REQUIRE_TRANSACTIONS=true
+TRUST_PROXY=true
+```
+
+Generate a JWT secret locally with:
+
+```bash
+openssl rand -base64 48
+```
+
+Do not add `PORT`; Render provides it automatically.
+
+7. Create the Web Service.
+8. In the Render service settings, set **Health Check Path** to `/health`.
+9. Wait for the deployment to finish and copy the API URL, for example:
 
 ```text
 https://payflow-api.onrender.com
@@ -66,8 +96,7 @@ https://payflow-api.onrender.com/health
 
 It should return `"status": "ok"`.
 
-Render generates `JWT_SECRET` automatically. Do not manually expose or copy it
-into the frontend.
+Never copy `JWT_SECRET` or `MONGODB_URI` into the frontend.
 
 ## 4. Deploy the frontend on Vercel
 
@@ -124,7 +153,8 @@ git commit -m "Describe the change"
 git push origin master
 ```
 
-Render rebuilds changes under `backend/`. Vercel rebuilds the frontend project.
+Because each service has its own root directory, Render rebuilds `backend/`
+changes and Vercel rebuilds `frontend/` changes.
 
 ## Production notes
 
