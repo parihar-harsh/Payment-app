@@ -44,6 +44,18 @@ module.exports = {
         0,
         "SIGNUP_BONUS"
     ),
+    SEED_DEMO_ACCOUNTS: process.env.SEED_DEMO_ACCOUNTS === "true",
+    DEMO_ACCOUNT_PASSWORD: process.env.DEMO_ACCOUNT_PASSWORD || "DemoPass123!",
+    DEMO_SENDER_BALANCE: parseNonNegativeInteger(
+        process.env.DEMO_SENDER_BALANCE,
+        10000,
+        "DEMO_SENDER_BALANCE"
+    ),
+    DEMO_RECEIVER_BALANCE: parseNonNegativeInteger(
+        process.env.DEMO_RECEIVER_BALANCE,
+        1000,
+        "DEMO_RECEIVER_BALANCE"
+    ),
     CORS_ORIGINS: (process.env.CORS_ORIGINS || "http://localhost:5173")
         .split(",")
         .map(origin => origin.trim())

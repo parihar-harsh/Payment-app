@@ -21,6 +21,36 @@ Generate a strong JWT secret instead of using the example value. The frontend
 origin must be present in `CORS_ORIGINS`. `SIGNUP_BONUS` is intended only for
 demo environments; omit it in production so new accounts start at zero.
 
+## Demo accounts
+
+For a deployed demo where clients need ready-made wallets to test debit/credit
+through the normal transfer flow, enable:
+
+```bash
+SEED_DEMO_ACCOUNTS=true
+DEMO_ACCOUNT_PASSWORD=DemoPass123!
+DEMO_SENDER_BALANCE=10000
+DEMO_RECEIVER_BALANCE=1000
+```
+
+The API will ensure these users exist at startup:
+
+```txt
+demo.sender@example.com / DemoPass123!
+demo.receiver@example.com / DemoPass123!
+```
+
+The sender starts with more balance so users can sign in as the sender, search
+for "Demo Receiver", and transfer money through the real transaction endpoint.
+Use these only for demo environments because the credentials are intentionally
+public.
+
+To seed manually instead of on every startup:
+
+```bash
+npm run seed:demo
+```
+
 For local MongoDB, initialize a single-node replica set and use a URI containing
 `replicaSet=rs0`. `REQUIRE_TRANSACTIONS=false` is only suitable for development
 that does not exercise signup or transfer operations.

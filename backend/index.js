@@ -1,11 +1,16 @@
 const app = require("./app");
 const { connectDB, disconnectDB } = require("./db");
-const { HOST, PORT } = require("./config");
+const { HOST, PORT, SEED_DEMO_ACCOUNTS } = require("./config");
+const { seedDemoAccounts } = require("./seedDemoAccounts");
 
 let server;
 
 const start = async () => {
     await connectDB();
+
+    if (SEED_DEMO_ACCOUNTS) {
+        await seedDemoAccounts();
+    }
 
     server = app.listen(PORT, HOST, () => {
         console.log(`API listening on ${HOST}:${PORT}`);

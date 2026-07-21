@@ -146,6 +146,19 @@ The frontend will typically run on `http://localhost:5173`.
 - JWT token is stored in session storage
 - Redirected to dashboard
 
+### Demo Login
+For deployed demos, the backend can seed two ready-made wallet users when
+`SEED_DEMO_ACCOUNTS=true` is set:
+
+```txt
+demo.sender@example.com / DemoPass123!
+demo.receiver@example.com / DemoPass123!
+```
+
+Sign in as `demo.sender@example.com`, search for "Demo Receiver", and send money
+through the normal transfer flow. This tests both debit and credit through the
+same MongoDB transaction logic used by real users.
+
 ### 3. Dashboard
 - View current balance
 - Search for other users in real-time
