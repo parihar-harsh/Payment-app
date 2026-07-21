@@ -67,6 +67,10 @@ JWT_SECRET=<at least 32 random characters>
 JWT_EXPIRES_IN=1h
 BCRYPT_ROUNDS=12
 SIGNUP_BONUS=10000
+SEED_DEMO_ACCOUNTS=true
+DEMO_ACCOUNT_PASSWORD=DemoPass123!
+DEMO_SENDER_BALANCE=10000
+DEMO_RECEIVER_BALANCE=1000
 CORS_ORIGINS=http://localhost:5173
 REQUIRE_TRANSACTIONS=true
 TRUST_PROXY=true
@@ -134,6 +138,16 @@ https://payment-app-example.vercel.app
 
 3. Save the environment change and let Render redeploy.
 4. Open the Vercel site and create two accounts to test a transfer.
+
+If `SEED_DEMO_ACCOUNTS=true` is enabled, you can also test immediately with:
+
+```text
+demo.sender@example.com / DemoPass123!
+demo.receiver@example.com / DemoPass123!
+```
+
+Sign in as `demo.sender@example.com`, search for "Demo Receiver", and send a
+transfer through the normal wallet flow.
 
 For multiple permitted sites, use a comma-separated value:
 
