@@ -284,6 +284,43 @@ Authorization: Bearer <token>
 }
 ```
 
+#### GET /account/transactions
+Get cursor-paginated transaction history (requires authentication)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+```txt
+limit=5
+cursor=<nextCursor from previous response>
+```
+
+Omit `cursor` for the first page.
+
+**Response:**
+```json
+{
+  "transactions": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "type": "debit",
+      "otherUserId": "507f1f77bcf86cd799439012",
+      "amount": 100,
+      "currency": "INR",
+      "createdAt": "2026-07-21T10:00:00.000Z"
+    }
+  ],
+  "pagination": {
+    "limit": 5,
+    "nextCursor": "eyJjcmVhdGVkQXQiOiIyMDI2...",
+    "hasMore": true
+  }
+}
+```
+
 #### POST /account/transfer
 Transfer money to another user (requires authentication)
 

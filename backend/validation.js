@@ -40,6 +40,11 @@ const paginationQuery = zod.object({
     limit: zod.coerce.number().int().min(1).max(100).default(20)
 }).strict();
 
+const transactionCursorQuery = zod.object({
+    cursor: zod.string().trim().min(1).max(512).optional(),
+    limit: zod.coerce.number().int().min(1).max(100).default(20)
+}).strict();
+
 const parse = (schema, value) => {
     const result = schema.safeParse(value);
 
@@ -60,5 +65,6 @@ module.exports = {
     transferBody,
     searchQuery,
     paginationQuery,
+    transactionCursorQuery,
     parse
 };

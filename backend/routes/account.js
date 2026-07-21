@@ -5,13 +5,53 @@ const { Account, Transfer } = require("../db");
 const { AppError } = require("../errors");
 const {
     transferBody,
-    paginationQuery,
+    transactionCursorQuery,
     parse
 } = require("../validation");
 
 const router = express.Router();
 
 router.use(authMiddleware);
+
+const encodeCursor = transaction => Buffer.from(JSON.stringify({
+    createdAt: transaction.createdAt.toISOString(),
+    id: transaction._id.toString()
+})).toString("base64url");
+
+const decodeCursor = cursor => {
+    if (!cursor) return null;
+
+    try {
+        const decoded = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+        const createdAt = new Date(decoded.createdAt);
+
+        if (
+            !decoded.id ||
+            !mongoose.Types.ObjectId.isValid(decoded.id) ||
+            Number.isNaN(createdAt.getTime())
+        ) {
+            throw new Error("Invalid cursor");
+        }
+
+        return {
+            createdAt,
+            id: new mongoose.Types.ObjectId(decoded.id)
+        };
+    } catch {
+        throw new AppError(400, "INVALID_CURSOR", "Invalid transaction cursor");
+    }
+};
+
+const serializeTransaction = (transaction, userId) => ({
+    id: transaction._id,
+    type: transaction.fromUserId.toString() === userId ? "debit" : "credit",
+    otherUserId: transaction.fromUserId.toString() === userId
+        ? transaction.toUserId
+        : transaction.fromUserId,
+    amount: transaction.amount,
+    currency: transaction.currency,
+    createdAt: transaction.createdAt
+});
 
 router.get("/balance", asyncHandler(async (req, res) => {
     const account = await Account.findOne({ userId: req.userId }).lean();
@@ -27,39 +67,45 @@ router.get("/balance", asyncHandler(async (req, res) => {
 }));
 
 router.get("/transactions", asyncHandler(async (req, res) => {
-    const { page, limit } = parse(paginationQuery, req.query);
-    const match = {
+    const { cursor, limit } = parse(transactionCursorQuery, req.query);
+    const decodedCursor = decodeCursor(cursor);
+    const ownershipMatch = {
         $or: [
             { fromUserId: req.userId },
             { toUserId: req.userId }
         ]
     };
+    const cursorMatch = decodedCursor
+        ? {
+            $or: [
+                { createdAt: { $lt: decodedCursor.createdAt } },
+                {
+                    createdAt: decodedCursor.createdAt,
+                    _id: { $lt: decodedCursor.id }
+                }
+            ]
+        }
+        : {};
+    const match = decodedCursor
+        ? { $and: [ownershipMatch, cursorMatch] }
+        : ownershipMatch;
 
-    const [transactions, total] = await Promise.all([
-        Transfer.find(match)
-            .sort({ createdAt: -1, _id: -1 })
-            .skip((page - 1) * limit)
-            .limit(limit)
-            .lean(),
-        Transfer.countDocuments(match)
-    ]);
+    const transactions = await Transfer.find(match)
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(limit + 1)
+        .lean();
+
+    const pageItems = transactions.slice(0, limit);
+    const nextCursor = transactions.length > limit && pageItems.length
+        ? encodeCursor(pageItems[pageItems.length - 1])
+        : null;
 
     res.json({
-        transactions: transactions.map(transaction => ({
-            id: transaction._id,
-            type: transaction.fromUserId.toString() === req.userId ? "debit" : "credit",
-            otherUserId: transaction.fromUserId.toString() === req.userId
-                ? transaction.toUserId
-                : transaction.fromUserId,
-            amount: transaction.amount,
-            currency: transaction.currency,
-            createdAt: transaction.createdAt
-        })),
+        transactions: pageItems.map(transaction => serializeTransaction(transaction, req.userId)),
         pagination: {
-            page,
             limit,
-            total,
-            pages: Math.ceil(total / limit)
+            nextCursor,
+            hasMore: Boolean(nextCursor)
         }
     });
 }));

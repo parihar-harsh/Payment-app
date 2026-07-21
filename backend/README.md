@@ -67,7 +67,7 @@ Render and Vercel workflow.
 - Transfer amounts must be positive whole INR values.
 - JWTs expire after the configured `JWT_EXPIRES_IN` duration.
 - `GET /health` reports API/database readiness.
-- `GET /api/v1/account/transactions` returns paginated transfer history.
+- `GET /api/v1/account/transactions` returns cursor-paginated transfer history.
 
 Errors use this shape:
 

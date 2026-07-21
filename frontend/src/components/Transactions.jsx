@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api, { getApiError } from "../api/client";
 import { Alert } from "./Alert";
 
@@ -11,29 +11,54 @@ const formatAmount = (amount, currency) => new Intl.NumberFormat("en-IN", {
 export function Transactions() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [nextCursor, setNextCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const loadTransactions = useCallback((cursor = null, signal = undefined) => {
+    if (cursor) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+    setError("");
 
-    api.get("/account/transactions", {
-      params: { page: 1, limit: 5 },
-      signal: controller.signal,
+    return api.get("/account/transactions", {
+      params: {
+        limit: 5,
+        ...(cursor ? { cursor } : {}),
+      },
+      signal,
     })
-      .then((response) => setTransactions(response.data.transactions))
+      .then((response) => {
+        const items = response.data.transactions || [];
+        const pagination = response.data.pagination || {};
+
+        setTransactions((prev) => (cursor ? [...prev, ...items] : items));
+        setNextCursor(pagination.nextCursor || null);
+        setHasMore(Boolean(pagination.hasMore));
+      })
       .catch((requestError) => {
         if (requestError.code !== "ERR_CANCELED") {
           setError(getApiError(requestError, "Unable to load activity"));
         }
       })
       .finally(() => {
-        if (!controller.signal.aborted) {
+        if (!signal?.aborted) {
           setLoading(false);
+          setLoadingMore(false);
         }
       });
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    loadTransactions(null, controller.signal);
 
     return () => controller.abort();
-  }, []);
+  }, [loadTransactions]);
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
@@ -77,6 +102,17 @@ export function Transactions() {
           </div>
         )}
       </div>
+
+      {!loading && hasMore && (
+        <button
+          type="button"
+          onClick={() => loadTransactions(nextCursor)}
+          disabled={loadingMore}
+          className="mt-5 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loadingMore ? "Loading..." : "Load older transactions"}
+        </button>
+      )}
     </section>
   );
 }

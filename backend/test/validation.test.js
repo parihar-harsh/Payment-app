@@ -5,6 +5,7 @@ const {
     updateBody,
     transferBody,
     searchQuery,
+    transactionCursorQuery,
     parse
 } = require("../validation");
 
@@ -69,6 +70,31 @@ test("search pagination has bounded defaults", () => {
 
     assert.throws(
         () => parse(searchQuery, { limit: 1000 }),
+        { name: "RequestValidationError" }
+    );
+});
+
+test("transaction cursor pagination validates cursor and bounded limit", () => {
+    const result = parse(transactionCursorQuery, {});
+    assert.deepEqual(result, {
+        limit: 20
+    });
+
+    assert.deepEqual(parse(transactionCursorQuery, {
+        cursor: "abc123",
+        limit: "5"
+    }), {
+        cursor: "abc123",
+        limit: 5
+    });
+
+    assert.throws(
+        () => parse(transactionCursorQuery, { page: 1 }),
+        { name: "RequestValidationError" }
+    );
+
+    assert.throws(
+        () => parse(transactionCursorQuery, { limit: 1000 }),
         { name: "RequestValidationError" }
     );
 });
